@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   const fleetPhotos = [
     {
@@ -57,12 +59,18 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <button className="rounded-lg bg-amber-300 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-200">
+            <Link
+              href="/booking"
+              className="rounded-lg bg-amber-300 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-200"
+            >
               Book a Ride
-            </button>
-            <button className="rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+            </Link>
+            <Link
+              href="/booking"
+              className="rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+            >
               View Fleet
-            </button>
+            </Link>
           </div>
 
           <div className="grid gap-4 pt-2 sm:grid-cols-3">

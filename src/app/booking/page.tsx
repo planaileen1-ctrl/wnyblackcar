@@ -1,0 +1,222 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+type VehicleOption = {
+  id: string;
+  name: string;
+  seats: string;
+  image: string;
+  baseFare: number;
+};
+
+const vehicles: VehicleOption[] = [
+  {
+    id: "suburban",
+    name: "Chevrolet Suburban",
+    seats: "Up to 6 passengers",
+    image:
+      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1600&q=80",
+    baseFare: 145,
+  },
+  {
+    id: "sedan",
+    name: "Luxury Sedan",
+    seats: "Up to 3 passengers",
+    image:
+      "https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=1600&q=80",
+    baseFare: 120,
+  },
+  {
+    id: "sprinter",
+    name: "Mercedes Sprinter Van",
+    seats: "Up to 14 passengers",
+    image:
+      "https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=1600&q=80",
+    baseFare: 220,
+  },
+];
+
+export default function BookingPage() {
+  const [selectedVehicle, setSelectedVehicle] = useState<string>(vehicles[0].id);
+  const [tripType, setTripType] = useState<"one-way" | "round-trip">("one-way");
+
+  const currentDateUs = useMemo(() => {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "America/New_York",
+    }).format(new Date());
+  }, []);
+
+  const selected = vehicles.find((vehicle) => vehicle.id === selectedVehicle) ?? vehicles[0];
+  const estimatedFare = tripType === "round-trip" ? selected.baseFare * 2 : selected.baseFare;
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.18em] text-amber-300">WNY BLACK CAR</p>
+            <p className="text-xs text-slate-400">Online Booking</p>
+          </div>
+          <p className="text-xs text-slate-300">{currentDateUs} • EST</p>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-7xl gap-8 px-6 py-10 lg:grid-cols-[1.2fr_0.8fr] lg:py-14">
+        <section className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 lg:p-8">
+          <h1 className="text-3xl font-bold sm:text-4xl">Book Your Ride</h1>
+          <p className="mt-2 text-sm text-slate-300 sm:text-base">
+            Secure your premium black car service in minutes.
+          </p>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Trip Type</span>
+              <select
+                value={tripType}
+                onChange={(event) => setTripType(event.target.value as "one-way" | "round-trip")}
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
+              >
+                <option value="one-way">One Way</option>
+                <option value="round-trip">Round Trip</option>
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Service Date</span>
+              <input
+                type="date"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
+              />
+            </label>
+
+            <label className="space-y-2 sm:col-span-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Pickup Address</span>
+              <input
+                type="text"
+                placeholder="Buffalo Niagara International Airport"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
+              />
+            </label>
+
+            <label className="space-y-2 sm:col-span-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Drop-off Address</span>
+              <input
+                type="text"
+                placeholder="Downtown Buffalo, NY"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Pickup Time</span>
+              <input
+                type="time"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Passengers</span>
+              <input
+                type="number"
+                min={1}
+                max={14}
+                defaultValue={2}
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
+              />
+            </label>
+          </div>
+
+          <div className="mt-8 space-y-3">
+            <p className="text-sm font-semibold text-slate-100">Select Vehicle</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {vehicles.map((vehicle) => (
+                <button
+                  key={vehicle.id}
+                  type="button"
+                  onClick={() => setSelectedVehicle(vehicle.id)}
+                  className={`group overflow-hidden rounded-xl border text-left transition ${
+                    selectedVehicle === vehicle.id
+                      ? "border-amber-300"
+                      : "border-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <div
+                    className="h-28 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${vehicle.image})` }}
+                  />
+                  <div className="bg-slate-900 p-3">
+                    <p className="text-sm font-semibold">{vehicle.name}</p>
+                    <p className="text-xs text-slate-300">{vehicle.seats}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Full Name</span>
+              <input
+                type="text"
+                placeholder="John Carter"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Email</span>
+              <input
+                type="email"
+                placeholder="john@email.com"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
+              />
+            </label>
+            <label className="space-y-2 sm:col-span-2">
+              <span className="text-xs font-medium tracking-wide text-slate-300">Phone Number</span>
+              <input
+                type="tel"
+                placeholder="(716) 000-0000"
+                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
+              />
+            </label>
+          </div>
+        </section>
+
+        <aside className="h-fit rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-6 lg:sticky lg:top-6">
+          <h2 className="text-xl font-semibold">Booking Summary</h2>
+          <p className="mt-2 text-sm text-slate-300">Review your trip before checkout.</p>
+
+          <div className="mt-6 space-y-3 text-sm">
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-3">
+              <p className="text-slate-400">Trip</p>
+              <p className="font-medium">{tripType === "round-trip" ? "Round Trip" : "One Way"}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-3">
+              <p className="text-slate-400">Vehicle</p>
+              <p className="font-medium">{selected.name}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-3">
+              <p className="text-slate-400">Capacity</p>
+              <p className="font-medium">{selected.seats}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-amber-300/30 bg-amber-300/10 p-4">
+            <p className="text-xs uppercase tracking-wide text-amber-200">Estimated total</p>
+            <p className="mt-1 text-2xl font-bold text-amber-300">${estimatedFare.toFixed(2)} USD</p>
+          </div>
+
+          <button className="mt-6 w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
+            Continue to Secure Checkout
+          </button>
+          <p className="mt-3 text-center text-xs text-slate-400">Stripe checkout integration (next step)</p>
+        </aside>
+      </main>
+    </div>
+  );
+}
