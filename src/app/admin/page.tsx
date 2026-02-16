@@ -20,6 +20,7 @@ import { defaultSiteContent, SiteContent } from "@/lib/site-content";
 type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 type PaymentStatus = "unpaid" | "paid" | "refunded";
 type ContentVersionAction = "save" | "restore";
+type AdminSection = "overview" | "bookings" | "home" | "booking" | "fleet" | "versions";
 
 type BookingRecord = {
   id: string;
@@ -103,6 +104,8 @@ export default function AdminPage() {
   const [contentVersions, setContentVersions] = useState<SiteContentVersion[]>([]);
   const [versionError, setVersionError] = useState<string>("");
   const [restoringVersionId, setRestoringVersionId] = useState<string>("");
+  const [imageLoadErrors, setImageLoadErrors] = useState<Record<string, boolean>>({});
+  const [activeSection, setActiveSection] = useState<AdminSection>("overview");
 
   const totalPending = useMemo(
     () => bookings.filter((booking) => booking.status === "pending").length,
@@ -116,6 +119,32 @@ export default function AdminPage() {
         .reduce((total, booking) => total + Number(booking.estimatedFare || 0), 0),
     [bookings],
   );
+
+  const invalidPriceItems = useMemo(
+    () => contentDraft.fleet.filter((item) => Number(item.baseFare) <= 0),
+    [contentDraft.fleet],
+  );
+
+  const invalidPhotoItems = useMemo(
+    () =>
+      contentDraft.fleet.filter((item) => {
+        const value = (item.image ?? "").trim();
+        if (!value) {
+          return true;
+        }
+
+        try {
+          const parsed = new URL(value);
+          const hasHttpProtocol = parsed.protocol === "http:" || parsed.protocol === "https:";
+          return !hasHttpProtocol || Boolean(imageLoadErrors[item.id]);
+        } catch {
+          return true;
+        }
+      }),
+    [contentDraft.fleet, imageLoadErrors],
+  );
+
+  const hasFleetValidationErrors = invalidPriceItems.length > 0 || invalidPhotoItems.length > 0;
 
   useEffect(() => {
     const savedPinState = window.sessionStorage.getItem(PIN_SESSION_KEY);
@@ -243,12 +272,30 @@ export default function AdminPage() {
     }).format(createdAt.toDate());
   }
 
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(value) ? value : 0);
+  }
+
+  function isValidHttpUrl(value: string) {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
   function unlockWithPin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPinError("");
 
     if (pinInput.trim() !== ADMIN_PIN) {
-      setPinError("PIN incorrecto.");
+      setPinError("Incorrect PIN.");
       return;
     }
 
@@ -266,7 +313,7 @@ export default function AdminPage() {
 
   async function updateBookingStatus(bookingId: string, status: BookingStatus) {
     if (!isPinUnlocked) {
-      setError("PIN admin requerido.");
+      setError("Admin PIN is required.");
       return;
     }
 
@@ -288,7 +335,7 @@ export default function AdminPage() {
 
   async function updatePaymentStatus(bookingId: string, paymentStatus: PaymentStatus) {
     if (!isPinUnlocked) {
-      setError("PIN admin requerido.");
+      setError("Admin PIN is required.");
       return;
     }
 
@@ -339,13 +386,25 @@ export default function AdminPage() {
     field: keyof SiteContent["fleet"][number],
     value: string | number,
   ) {
+    const itemId = contentDraft.fleet[index]?.id;
+
+    if (field === "image" && itemId) {
+      setImageLoadErrors((previous) => ({
+        ...previous,
+        [itemId]: false,
+      }));
+    }
+
     setContentDraft((previous) => ({
       ...previous,
       fleet: previous.fleet.map((item, itemIndex) =>
         itemIndex === index
           ? {
               ...item,
-              [field]: field === "baseFare" ? Number(value) : value,
+              [field]:
+                field === "baseFare"
+                  ? Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0)
+                  : value,
             }
           : item,
       ),
@@ -354,7 +413,22 @@ export default function AdminPage() {
 
   async function saveContentDraft() {
     if (!isPinUnlocked) {
-      setContentError("PIN admin requerido.");
+      setContentError("Admin PIN is required.");
+      return;
+    }
+
+    if (hasFleetValidationErrors) {
+      const issues: string[] = [];
+
+      if (invalidPriceItems.length > 0) {
+        issues.push(`Prices must be greater than $0 for: ${invalidPriceItems.map((item) => item.id).join(", ")}`);
+      }
+
+      if (invalidPhotoItems.length > 0) {
+        issues.push(`Valid Photo URL is required for: ${invalidPhotoItems.map((item) => item.id).join(", ")}`);
+      }
+
+      setContentError(`Cannot save yet. ${issues.join(". ")}.`);
       return;
     }
 
@@ -405,7 +479,7 @@ export default function AdminPage() {
 
   async function restoreContentVersion(versionId: string, snapshot: SiteContent) {
     if (!isPinUnlocked) {
-      setContentError("PIN admin requerido.");
+      setContentError("Admin PIN is required.");
       return;
     }
 
@@ -469,7 +543,7 @@ export default function AdminPage() {
           </p>
           <h1 className="mt-3 text-2xl font-bold">Admin Login</h1>
           <p className="mt-2 text-sm text-neutral-400">
-            Ingresa el PIN para entrar al panel de administración.
+            Enter your PIN to access the admin panel.
           </p>
 
           {firebaseConfigError ? (
@@ -498,7 +572,7 @@ export default function AdminPage() {
               type="submit"
               className="w-full rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-400"
             >
-              Entrar al admin
+              Enter admin
             </button>
           </form>
         </div>
@@ -537,330 +611,518 @@ export default function AdminPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 pb-10 pt-28">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
-              LIVE BOOKING DASHBOARD
-            </p>
-            <h1 className="mt-3 text-3xl font-bold">Admin Booking Dashboard</h1>
-            <p className="mt-1 text-sm text-neutral-400">Manage trip status, payment updates and live booking flow.</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-right">
-              <p className="text-xs text-neutral-400">Pending</p>
-              <p className="text-xl font-semibold text-white">{totalPending}</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-right">
-              <p className="text-xs text-neutral-400">Paid Revenue</p>
-              <p className="text-xl font-semibold text-amber-400">${totalRevenue.toFixed(2)}</p>
-            </div>
-          </div>
+        <header className="mb-6">
+          <p className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
+            ADMIN PANEL
+          </p>
+          <h1 className="mt-3 text-3xl font-bold">WordPress-style Admin Panel</h1>
+          <p className="mt-1 text-sm text-neutral-400">Left navigation by content groups, right editor by section.</p>
         </header>
 
-        {error ? (
-          <p className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}
-          </p>
-        ) : null}
-
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/60">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-white/10 text-left text-sm">
-              <thead className="bg-neutral-900/90 text-xs uppercase tracking-wide text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Route</th>
-                  <th className="px-4 py-3">Trip</th>
-                  <th className="px-4 py-3">Vehicle</th>
-                  <th className="px-4 py-3">Fare</th>
-                  <th className="px-4 py-3">Booking Status</th>
-                  <th className="px-4 py-3">Payment</th>
-                  <th className="px-4 py-3">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {loading ? (
-                  <tr>
-                    <td className="px-4 py-6 text-neutral-400" colSpan={8}>
-                      Loading bookings...
-                    </td>
-                  </tr>
-                ) : bookings.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-6 text-neutral-400" colSpan={8}>
-                      No bookings yet.
-                    </td>
-                  </tr>
-                ) : (
-                  bookings.map((booking) => (
-                    <tr key={booking.id} className="align-top">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-white">{booking.customerName || "—"}</p>
-                        <p className="text-xs text-neutral-300">{booking.customerEmail || "—"}</p>
-                        <p className="text-xs text-neutral-400">{booking.customerPhone || "—"}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="max-w-xs text-xs text-neutral-200">{booking.pickupAddress || "—"}</p>
-                        <p className="my-1 text-xs text-neutral-500">to</p>
-                        <p className="max-w-xs text-xs text-neutral-200">{booking.dropoffAddress || "—"}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-200">
-                        <p>{formatTripType(booking.tripType)}</p>
-                        <p className="text-neutral-400">{booking.serviceDate || "—"}</p>
-                        <p className="text-neutral-400">{booking.pickupTime || "—"}</p>
-                        <p className="text-neutral-400">Passengers: {booking.passengers || 0}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-200">{booking.vehicleName || "—"}</td>
-                      <td className="px-4 py-3 font-semibold text-amber-400">
-                        ${Number(booking.estimatedFare || 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={booking.status}
-                          disabled={savingId === `${booking.id}:status`}
-                          onChange={(event) =>
-                            updateBookingStatus(booking.id, event.target.value as BookingStatus)
-                          }
-                          className="w-32 rounded-md border border-white/15 bg-neutral-950 px-2 py-1.5 text-xs text-white outline-none focus:border-amber-400"
-                        >
-                          {BOOKING_STATUSES.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={booking.paymentStatus}
-                          disabled={savingId === `${booking.id}:payment`}
-                          onChange={(event) =>
-                            updatePaymentStatus(booking.id, event.target.value as PaymentStatus)
-                          }
-                          className="w-28 rounded-md border border-white/15 bg-neutral-950 px-2 py-1.5 text-xs text-white outline-none focus:border-amber-400"
-                        >
-                          {PAYMENT_STATUSES.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-400">{formatDateTime(booking.createdAt)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <p className="mt-4 text-center text-xs text-neutral-500">
-          Real-time sync enabled via Firestore snapshot listeners.
-        </p>
-
-        <section className="mt-8 rounded-3xl border border-white/10 bg-neutral-900/60 p-6">
-          <header className="mb-6">
-            <p className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
-              WEBSITE CONTENT MANAGER
-            </p>
-            <h2 className="mt-3 text-2xl font-bold">Edit texts, photos and prices</h2>
-            <p className="mt-1 text-sm text-neutral-400">
-              Changes update Home and Booking pages automatically.
-            </p>
-          </header>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <article className="space-y-3 rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
-              <h3 className="text-sm font-semibold text-white">Home hero copy</h3>
-
-              <input
-                value={contentDraft.home.heroBadge}
-                onChange={(event) => updateHomeField("heroBadge", event.target.value)}
-                placeholder="Hero badge"
-                className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-              <input
-                value={contentDraft.home.heroTitleLine1}
-                onChange={(event) => updateHomeField("heroTitleLine1", event.target.value)}
-                placeholder="Hero title line 1"
-                className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-              <input
-                value={contentDraft.home.heroTitleLine2}
-                onChange={(event) => updateHomeField("heroTitleLine2", event.target.value)}
-                placeholder="Hero title line 2"
-                className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-              <textarea
-                value={contentDraft.home.heroDescription}
-                onChange={(event) => updateHomeField("heroDescription", event.target.value)}
-                placeholder="Hero description"
-                className="h-24 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  value={contentDraft.home.primaryCta}
-                  onChange={(event) => updateHomeField("primaryCta", event.target.value)}
-                  placeholder="Primary CTA"
-                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                />
-                <input
-                  value={contentDraft.home.secondaryCta}
-                  onChange={(event) => updateHomeField("secondaryCta", event.target.value)}
-                  placeholder="Secondary CTA"
-                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                />
-              </div>
-            </article>
-
-            <article className="space-y-3 rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
-              <h3 className="text-sm font-semibold text-white">Booking page copy</h3>
-              <input
-                value={contentDraft.booking.formTitle}
-                onChange={(event) => updateBookingField("formTitle", event.target.value)}
-                placeholder="Booking title"
-                className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-              <textarea
-                value={contentDraft.booking.formSubtitle}
-                onChange={(event) => updateBookingField("formSubtitle", event.target.value)}
-                placeholder="Booking subtitle"
-                className="h-24 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-              />
-            </article>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <h3 className="text-sm font-semibold text-white">Fleet content and pricing</h3>
-            {contentDraft.fleet.map((item, index) => (
-              <article key={item.id} className="rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-amber-400">
-                  {item.id}
-                </p>
-
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <input
-                    value={item.name}
-                    onChange={(event) => updateFleetField(index, "name", event.target.value)}
-                    placeholder="Vehicle name"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                  <input
-                    value={item.type}
-                    onChange={(event) => updateFleetField(index, "type", event.target.value)}
-                    placeholder="Vehicle class"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={item.baseFare}
-                    onChange={(event) => updateFleetField(index, "baseFare", Number(event.target.value || 0))}
-                    placeholder="Base fare"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                  <input
-                    value={item.seats}
-                    onChange={(event) => updateFleetField(index, "seats", event.target.value)}
-                    placeholder="Seats text"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                  <input
-                    value={item.luggage}
-                    onChange={(event) => updateFleetField(index, "luggage", event.target.value)}
-                    placeholder="Luggage text"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                  <input
-                    value={item.image}
-                    onChange={(event) => updateFleetField(index, "image", event.target.value)}
-                    placeholder="Image URL"
-                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <textarea
-                  value={item.description}
-                  onChange={(event) => updateFleetField(index, "description", event.target.value)}
-                  placeholder="Vehicle description"
-                  className="mt-3 h-20 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
-                />
-              </article>
-            ))}
-          </div>
-
-          {contentError ? (
-            <p className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-              {contentError}
-            </p>
-          ) : null}
-
-          {contentMessage ? (
-            <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-              {contentMessage}
-            </p>
-          ) : null}
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={saveContentDraft}
-              disabled={contentSaving}
-              className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {contentSaving ? "Saving content..." : "Save website content"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setContentDraft(defaultSiteContent)}
-              className="rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              Reset to defaults
-            </button>
-          </div>
-
-          <section className="mt-8 rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-white">Content versions</h3>
-              <p className="text-xs text-neutral-400">Last {contentVersions.length} snapshots</p>
+        <section className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-2xl border border-white/10 bg-neutral-900/60 p-4 lg:sticky lg:top-28 lg:h-fit">
+            <p className="px-2 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">Operations</p>
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={() => setActiveSection("overview")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "overview"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("bookings")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "bookings"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Bookings
+              </button>
             </div>
 
-            {versionError ? (
-              <p className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-                {versionError}
+            <p className="mt-5 px-2 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">CMS</p>
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={() => setActiveSection("home")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "home"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("booking")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "booking"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Booking Page
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("fleet")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "fleet"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Fleet
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("versions")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  activeSection === "versions"
+                    ? "bg-amber-500 text-black font-semibold"
+                    : "text-neutral-200 hover:bg-white/10"
+                }`}
+              >
+                Versions
+              </button>
+            </div>
+          </aside>
+
+          <section className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5">
+            {(activeSection === "home" || activeSection === "booking" || activeSection === "fleet") && (
+              <div className="mb-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={saveContentDraft}
+                  disabled={contentSaving || hasFleetValidationErrors}
+                  className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {contentSaving ? "Saving..." : hasFleetValidationErrors ? "Fix validation errors to save" : "Save changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContentDraft(defaultSiteContent)}
+                  className="rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            )}
+
+            {contentError ? (
+              <p className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                {contentError}
               </p>
             ) : null}
 
-            {contentVersions.length === 0 ? (
-              <p className="text-sm text-neutral-400">No CMS versions yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {contentVersions.map((version) => (
-                  <article
-                    key={version.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-neutral-900/80 px-3 py-2"
-                  >
-                    <div>
-                      <p className="text-sm text-white">{formatDateTime(version.createdAt)}</p>
-                      <p className="text-xs text-neutral-400">
-                        {version.action === "restore" ? "Restore" : "Save"} • {version.createdByEmail || "unknown"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => restoreContentVersion(version.id, version.snapshot)}
-                      disabled={restoringVersionId === version.id || contentSaving}
-                      className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {restoringVersionId === version.id ? "Restoring..." : "Restore"}
-                    </button>
-                  </article>
-                ))}
+            {contentMessage ? (
+              <p className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                {contentMessage}
+              </p>
+            ) : null}
+
+            {activeSection === "overview" ? (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Overview</h2>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-white/10 bg-neutral-950/70 px-4 py-3">
+                    <p className="text-xs text-neutral-400">Total bookings</p>
+                    <p className="mt-1 text-2xl font-semibold text-white">{bookings.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-neutral-950/70 px-4 py-3">
+                    <p className="text-xs text-neutral-400">Pending</p>
+                    <p className="mt-1 text-2xl font-semibold text-white">{totalPending}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-neutral-950/70 px-4 py-3">
+                    <p className="text-xs text-neutral-400">Paid revenue</p>
+                    <p className="mt-1 text-2xl font-semibold text-amber-400">${totalRevenue.toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-neutral-950/70 px-4 py-3">
+                    <p className="text-xs text-neutral-400">CMS versions</p>
+                    <p className="mt-1 text-2xl font-semibold text-white">{contentVersions.length}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-500">Use the left menu to edit content by group.</p>
               </div>
-            )}
+            ) : null}
+
+            {activeSection === "bookings" ? (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Bookings</h2>
+
+                {error ? (
+                  <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                    {error}
+                  </p>
+                ) : null}
+
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-white/10 text-left text-sm">
+                      <thead className="bg-neutral-900/90 text-xs uppercase tracking-wide text-neutral-400">
+                        <tr>
+                          <th className="px-4 py-3">Customer</th>
+                          <th className="px-4 py-3">Route</th>
+                          <th className="px-4 py-3">Trip</th>
+                          <th className="px-4 py-3">Vehicle</th>
+                          <th className="px-4 py-3">Fare</th>
+                          <th className="px-4 py-3">Booking Status</th>
+                          <th className="px-4 py-3">Payment</th>
+                          <th className="px-4 py-3">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {loading ? (
+                          <tr>
+                            <td className="px-4 py-6 text-neutral-400" colSpan={8}>
+                              Loading bookings...
+                            </td>
+                          </tr>
+                        ) : bookings.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-6 text-neutral-400" colSpan={8}>
+                              No bookings yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          bookings.map((booking) => (
+                            <tr key={booking.id} className="align-top">
+                              <td className="px-4 py-3">
+                                <p className="font-medium text-white">{booking.customerName || "—"}</p>
+                                <p className="text-xs text-neutral-300">{booking.customerEmail || "—"}</p>
+                                <p className="text-xs text-neutral-400">{booking.customerPhone || "—"}</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="max-w-xs text-xs text-neutral-200">{booking.pickupAddress || "—"}</p>
+                                <p className="my-1 text-xs text-neutral-500">to</p>
+                                <p className="max-w-xs text-xs text-neutral-200">{booking.dropoffAddress || "—"}</p>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-neutral-200">
+                                <p>{formatTripType(booking.tripType)}</p>
+                                <p className="text-neutral-400">{booking.serviceDate || "—"}</p>
+                                <p className="text-neutral-400">{booking.pickupTime || "—"}</p>
+                                <p className="text-neutral-400">Passengers: {booking.passengers || 0}</p>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-neutral-200">{booking.vehicleName || "—"}</td>
+                              <td className="px-4 py-3 font-semibold text-amber-400">
+                                ${Number(booking.estimatedFare || 0).toFixed(2)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={booking.status}
+                                  disabled={savingId === `${booking.id}:status`}
+                                  onChange={(event) =>
+                                    updateBookingStatus(booking.id, event.target.value as BookingStatus)
+                                  }
+                                  className="w-32 rounded-md border border-white/15 bg-neutral-950 px-2 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                                >
+                                  {BOOKING_STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                      {status}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={booking.paymentStatus}
+                                  disabled={savingId === `${booking.id}:payment`}
+                                  onChange={(event) =>
+                                    updatePaymentStatus(booking.id, event.target.value as PaymentStatus)
+                                  }
+                                  className="w-28 rounded-md border border-white/15 bg-neutral-950 px-2 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                                >
+                                  {PAYMENT_STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                      {status}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-neutral-400">{formatDateTime(booking.createdAt)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === "home" ? (
+              <article className="space-y-3 rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
+                <h2 className="text-2xl font-bold">Home</h2>
+                <input
+                  value={contentDraft.home.heroBadge}
+                  onChange={(event) => updateHomeField("heroBadge", event.target.value)}
+                  placeholder="Hero badge"
+                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+                <input
+                  value={contentDraft.home.heroTitleLine1}
+                  onChange={(event) => updateHomeField("heroTitleLine1", event.target.value)}
+                  placeholder="Hero title line 1"
+                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+                <input
+                  value={contentDraft.home.heroTitleLine2}
+                  onChange={(event) => updateHomeField("heroTitleLine2", event.target.value)}
+                  placeholder="Hero title line 2"
+                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+                <textarea
+                  value={contentDraft.home.heroDescription}
+                  onChange={(event) => updateHomeField("heroDescription", event.target.value)}
+                  placeholder="Hero description"
+                  className="h-24 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    value={contentDraft.home.primaryCta}
+                    onChange={(event) => updateHomeField("primaryCta", event.target.value)}
+                    placeholder="Primary CTA"
+                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                  <input
+                    value={contentDraft.home.secondaryCta}
+                    onChange={(event) => updateHomeField("secondaryCta", event.target.value)}
+                    placeholder="Secondary CTA"
+                    className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </div>
+              </article>
+            ) : null}
+
+            {activeSection === "booking" ? (
+              <article className="space-y-3 rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
+                <h2 className="text-2xl font-bold">Booking Page</h2>
+                <p className="text-sm text-neutral-400">
+                  These fields are shown at the top of the public booking page.
+                </p>
+                <input
+                  value={contentDraft.booking.formTitle}
+                  onChange={(event) => updateBookingField("formTitle", event.target.value)}
+                  placeholder="Booking title"
+                  className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+                <textarea
+                  value={contentDraft.booking.formSubtitle}
+                  onChange={(event) => updateBookingField("formSubtitle", event.target.value)}
+                  placeholder="Booking subtitle"
+                  className="h-24 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                />
+              </article>
+            ) : null}
+
+            {activeSection === "fleet" ? (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Fleet</h2>
+                <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  <p className="font-semibold">Where to edit prices and photos</p>
+                  <p className="mt-1">
+                    Use <span className="font-semibold">Base Fare (USD)</span> for pricing and <span className="font-semibold">Photo URL</span> for vehicle images.
+                    These values are used on both the Home fleet cards and the Booking vehicle selection.
+                  </p>
+                </div>
+                {hasFleetValidationErrors ? (
+                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+                    <p className="font-semibold">Save blocked until all fleet items are valid.</p>
+                    {invalidPriceItems.length > 0 ? (
+                      <p className="mt-1">Prices must be greater than $0 for: {invalidPriceItems.map((item) => item.id).join(", ")}.</p>
+                    ) : null}
+                    {invalidPhotoItems.length > 0 ? (
+                      <p className="mt-1">Photo URL must be valid and loadable for: {invalidPhotoItems.map((item) => item.id).join(", ")}.</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {contentDraft.fleet.map((item, index) => {
+                  const hasInvalidPrice = Number(item.baseFare) <= 0;
+                  const photoValue = (item.image ?? "").trim();
+                  const hasInvalidPhoto =
+                    !photoValue || !isValidHttpUrl(photoValue) || Boolean(imageLoadErrors[item.id]);
+                  const isItemValid = !hasInvalidPrice && !hasInvalidPhoto;
+
+                  return (
+                    <article key={item.id} className="rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">{item.id}</p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              isItemValid
+                                ? "bg-emerald-500/20 text-emerald-300"
+                                : "bg-rose-500/20 text-rose-300"
+                            }`}
+                          >
+                            {isItemValid ? "Valid" : "Needs fixes"}
+                          </span>
+                          <p className="text-xs text-neutral-400">Used in Home + Booking</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <input
+                          value={item.name}
+                          onChange={(event) => updateFleetField(index, "name", event.target.value)}
+                          placeholder="Vehicle name"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                        <input
+                          value={item.type}
+                          onChange={(event) => updateFleetField(index, "type", event.target.value)}
+                          placeholder="Vehicle class"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.baseFare}
+                          onChange={(event) =>
+                            updateFleetField(index, "baseFare", Number(event.target.value || 0))
+                          }
+                          placeholder="Base Fare (USD)"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                        <input
+                          value={item.seats}
+                          onChange={(event) => updateFleetField(index, "seats", event.target.value)}
+                          placeholder="Seats text"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                        <input
+                          value={item.luggage}
+                          onChange={(event) => updateFleetField(index, "luggage", event.target.value)}
+                          placeholder="Luggage text"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                        <input
+                          value={item.image}
+                          onChange={(event) => updateFleetField(index, "image", event.target.value)}
+                          placeholder="Photo URL"
+                          className="w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      {(hasInvalidPrice || hasInvalidPhoto) ? (
+                        <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                          {hasInvalidPrice ? <p>Base Fare must be greater than $0.</p> : null}
+                          {hasInvalidPhoto ? (
+                            <p>Photo URL must be a valid and loadable http/https image link.</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+                        <div className="overflow-hidden rounded-xl border border-white/10 bg-neutral-900">
+                          {item.image && !imageLoadErrors[item.id] ? (
+                            <img
+                              src={item.image}
+                              alt={`${item.name} preview`}
+                              className="h-32 w-full object-cover"
+                              onError={() =>
+                                setImageLoadErrors((previous) => ({
+                                  ...previous,
+                                  [item.id]: true,
+                                }))
+                              }
+                              onLoad={() =>
+                                setImageLoadErrors((previous) => ({
+                                  ...previous,
+                                  [item.id]: false,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <div className="flex h-32 items-center justify-center px-3 text-center text-xs text-neutral-400">
+                              Image preview unavailable. Check Photo URL.
+                            </div>
+                          )}
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-neutral-900/70 p-3 text-sm text-neutral-300">
+                          <p>
+                            <span className="font-semibold text-white">Validation:</span>{" "}
+                            {isItemValid ? "Ready to save" : "Fix required"}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-white">Current Price:</span>{" "}
+                            {formatCurrency(Number(item.baseFare || 0))}
+                          </p>
+                          <p className="mt-1 break-all">
+                            <span className="font-semibold text-white">Current Photo URL:</span>{" "}
+                            {item.image || "—"}
+                          </p>
+                          {imageLoadErrors[item.id] ? (
+                            <p className="mt-2 text-xs text-rose-300">
+                              Photo URL could not be loaded. Use a direct image URL (jpg, png, webp).
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs text-neutral-400">
+                            Formatted fare preview: {formatCurrency(Number(item.baseFare || 0))}
+                          </p>
+                        </div>
+                      </div>
+
+                      <textarea
+                        value={item.description}
+                        onChange={(event) => updateFleetField(index, "description", event.target.value)}
+                        placeholder="Vehicle description"
+                        className="mt-3 h-20 w-full rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                      />
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {activeSection === "versions" ? (
+              <section className="space-y-4">
+                <h2 className="text-2xl font-bold">Versions</h2>
+
+                {versionError ? (
+                  <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                    {versionError}
+                  </p>
+                ) : null}
+
+                {contentVersions.length === 0 ? (
+                  <p className="text-sm text-neutral-400">No CMS versions yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {contentVersions.map((version) => (
+                      <article
+                        key={version.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-neutral-950/70 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm text-white">{formatDateTime(version.createdAt)}</p>
+                          <p className="text-xs text-neutral-400">
+                            {version.action === "restore" ? "Restore" : "Save"} • {version.createdByEmail || "unknown"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => restoreContentVersion(version.id, version.snapshot)}
+                          disabled={restoringVersionId === version.id || contentSaving}
+                          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {restoringVersionId === version.id ? "Restoring..." : "Restore"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
           </section>
         </section>
       </main>
