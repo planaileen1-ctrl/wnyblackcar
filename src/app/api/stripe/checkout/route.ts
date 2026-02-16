@@ -7,6 +7,7 @@ type CheckoutBody = {
   bookingId?: string;
   vehicleId?: string;
   serviceType?: ServiceType;
+  estimatedFare?: number;
   customerName?: string;
   customerEmail?: string;
 };
@@ -59,7 +60,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid vehicle or service type." }, { status: 400 });
     }
 
-    const amountUsd = vehicleBaseFare[body.vehicleId] * serviceMultiplier[body.serviceType];
+    const fallbackAmountUsd = vehicleBaseFare[body.vehicleId] * serviceMultiplier[body.serviceType];
+    const estimatedFareFromRequest = Number(body.estimatedFare ?? 0);
+    const amountUsd =
+      Number.isFinite(estimatedFareFromRequest) && estimatedFareFromRequest > 0
+        ? estimatedFareFromRequest
+        : fallbackAmountUsd;
     const unitAmount = Math.round(amountUsd * 100);
 
     if (unitAmount <= 0) {

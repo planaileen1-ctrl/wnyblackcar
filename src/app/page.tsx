@@ -1,41 +1,27 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { firestoreDb } from "@/lib/firebase";
+import { defaultSiteContent, SiteContent } from "@/lib/site-content";
 
 export default function Home() {
-  const fleetPhotos = [
-    {
-      id: 1,
-      name: "Luxury Sedan",
-      type: "Executive Class",
-      capacity: "3 Passengers",
-      luggage: "2 Suitcases",
-      image:
-        "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200",
-      description:
-        "Perfect for individual business trips and airport transfers with quiet comfort and privacy.",
-    },
-    {
-      id: 2,
-      name: "Premium SUV",
-      type: "First Class",
-      capacity: "6 Passengers",
-      luggage: "5 Suitcases",
-      image:
-        "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=1200",
-      description:
-        "Ample space for families and executive groups traveling with extensive luggage.",
-    },
-    {
-      id: 3,
-      name: "Sprinter Van",
-      type: "Group Class",
-      capacity: "14 Passengers",
-      luggage: "10 Suitcases",
-      image:
-        "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=1200",
-      description:
-        "A refined solution for event logistics, private groups and corporate transportation.",
-    },
-  ];
+  const [siteContent, setSiteContent] = useState<SiteContent>(defaultSiteContent);
+
+  const fleetPhotos = useMemo(
+    () =>
+      siteContent.fleet.map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        capacity: item.seats,
+        luggage: item.luggage,
+        image: item.image,
+        description: item.description,
+      })),
+    [siteContent.fleet],
+  );
 
   const signatureServices = [
     {
@@ -69,6 +55,49 @@ export default function Home() {
     year: "numeric",
     timeZone: "America/New_York",
   }).format(new Date());
+
+  useEffect(() => {
+    if (!firestoreDb) {
+      return;
+    }
+
+    const contentRef = doc(firestoreDb, "siteContent", "main");
+
+    const unsubscribe = onSnapshot(contentRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setSiteContent(defaultSiteContent);
+        return;
+      }
+
+      const data = snapshot.data() as Partial<SiteContent>;
+
+      setSiteContent({
+        home: {
+          ...defaultSiteContent.home,
+          ...(data.home ?? {}),
+        },
+        booking: {
+          ...defaultSiteContent.booking,
+          ...(data.booking ?? {}),
+        },
+        fleet: (data.fleet ?? defaultSiteContent.fleet).map((item, index) => {
+          const fallback = defaultSiteContent.fleet[index] ?? defaultSiteContent.fleet[0];
+          return {
+            id: item.id ?? fallback.id,
+            name: item.name ?? fallback.name,
+            type: item.type ?? fallback.type,
+            seats: item.seats ?? fallback.seats,
+            luggage: item.luggage ?? fallback.luggage,
+            image: item.image ?? fallback.image,
+            description: item.description ?? fallback.description,
+            baseFare: Number(item.baseFare ?? fallback.baseFare),
+          };
+        }),
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-amber-500 selection:text-black">
@@ -118,20 +147,19 @@ export default function Home() {
 
           <div className="relative z-10 mx-auto max-w-5xl text-center">
             <p className="mb-6 inline-block rounded-full bg-amber-500/20 px-4 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
-              PREMIUM SERVICE IN WESTERN NEW YORK
+              {siteContent.home.heroBadge}
             </p>
 
             <h1 className="text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-              Travel with distinction.
+              {siteContent.home.heroTitleLine1}
               <br />
               <span className="text-transparent bg-linear-to-r from-white to-neutral-500 bg-clip-text">
-                Arrive with precision.
+                {siteContent.home.heroTitleLine2}
               </span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-neutral-300 md:text-xl">
-              Elegance, discretion and professionalism in every mile. Specialists in executive
-              transportation, airport transfers and private event mobility.
+              {siteContent.home.heroDescription}
             </p>
 
             <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
@@ -139,13 +167,13 @@ export default function Home() {
                 href="/booking"
                 className="rounded-full bg-white px-10 py-4 text-base font-bold text-black transition hover:bg-amber-500"
               >
-                Rent Your Vehicle
+                {siteContent.home.primaryCta}
               </Link>
               <Link
                 href="#services"
                 className="rounded-full border border-white/20 bg-white/5 px-10 py-4 text-base font-semibold text-white transition hover:bg-white/10"
               >
-                View Services
+                {siteContent.home.secondaryCta}
               </Link>
             </div>
           </div>

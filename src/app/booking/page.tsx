@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import {
   ArrowRight,
   Briefcase,
@@ -15,58 +15,9 @@ import {
 } from "lucide-react";
 import { firebaseConfigError, firestoreDb } from "@/lib/firebase";
 import VirtualConcierge from "@/components/virtual-concierge";
+import { defaultSiteContent, SiteContent, SiteFleetItem } from "@/lib/site-content";
 
 type ServiceType = "one-way" | "round-trip" | "hourly";
-
-type VehicleOption = {
-  id: string;
-  name: string;
-  type: string;
-  seats: string;
-  luggage: string;
-  image: string;
-  baseFare: number;
-  description: string;
-};
-
-const vehicles: VehicleOption[] = [
-  {
-    id: "sedan",
-    name: "Luxury Sedan",
-    type: "Executive Class",
-    seats: "Up to 3 passengers",
-    luggage: "2 suitcases",
-    image:
-      "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200",
-    baseFare: 120,
-    description:
-      "Perfect for executive transfers and individual business travel with total comfort and privacy.",
-  },
-  {
-    id: "suv",
-    name: "Premium SUV",
-    type: "First Class",
-    seats: "Up to 6 passengers",
-    luggage: "5 suitcases",
-    image:
-      "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=1200",
-    baseFare: 145,
-    description:
-      "Ample space for families and small groups with premium comfort and elegant arrival presence.",
-  },
-  {
-    id: "sprinter",
-    name: "Executive Van",
-    type: "Group Class",
-    seats: "Up to 14 passengers",
-    luggage: "10 suitcases",
-    image:
-      "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=1200",
-    baseFare: 220,
-    description:
-      "The ideal option for event logistics, executive teams, and large group transportation.",
-  },
-];
 
 type BookingFormState = {
   serviceType: ServiceType;
@@ -94,6 +45,7 @@ export default function BookingPage() {
   const [submitMessage, setSubmitMessage] = useState<string>("");
   const [submitError, setSubmitError] = useState<string>("");
   const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null);
+  const [siteContent, setSiteContent] = useState<SiteContent>(defaultSiteContent);
   const [formState, setFormState] = useState<BookingFormState>({
     serviceType: "one-way",
     serviceDate: "",
@@ -117,7 +69,9 @@ export default function BookingPage() {
     }).format(new Date());
   }, []);
 
-  const selected = vehicles.find((vehicle) => vehicle.id === selectedVehicle) ?? null;
+  const fleetOptions = siteContent.fleet;
+
+  const selected = fleetOptions.find((vehicle) => vehicle.id === selectedVehicle) ?? null;
 
   const serviceMultiplier = useMemo(() => {
     if (formState.serviceType === "round-trip") return 2;
@@ -134,6 +88,57 @@ export default function BookingPage() {
     const params = new URLSearchParams(window.location.search);
     setCheckoutStatus(params.get("checkout"));
   }, []);
+
+  useEffect(() => {
+    if (!firestoreDb) {
+      return;
+    }
+
+    const contentRef = doc(firestoreDb, "siteContent", "main");
+
+    const unsubscribe = onSnapshot(contentRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setSiteContent(defaultSiteContent);
+        return;
+      }
+
+      const data = snapshot.data() as Partial<SiteContent>;
+
+      const mergedFleet: SiteFleetItem[] = (data.fleet ?? defaultSiteContent.fleet).map((item, index) => {
+        const fallback = defaultSiteContent.fleet[index] ?? defaultSiteContent.fleet[0];
+        return {
+          id: item.id ?? fallback.id,
+          name: item.name ?? fallback.name,
+          type: item.type ?? fallback.type,
+          seats: item.seats ?? fallback.seats,
+          luggage: item.luggage ?? fallback.luggage,
+          image: item.image ?? fallback.image,
+          description: item.description ?? fallback.description,
+          baseFare: Number(item.baseFare ?? fallback.baseFare),
+        };
+      });
+
+      setSiteContent({
+        home: {
+          ...defaultSiteContent.home,
+          ...(data.home ?? {}),
+        },
+        booking: {
+          ...defaultSiteContent.booking,
+          ...(data.booking ?? {}),
+        },
+        fleet: mergedFleet,
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (selectedVehicle && !fleetOptions.some((vehicle) => vehicle.id === selectedVehicle)) {
+      setSelectedVehicle("");
+    }
+  }, [fleetOptions, selectedVehicle]);
 
   function updateField<K extends keyof BookingFormState>(field: K, value: BookingFormState[K]) {
     setFormState((previous) => ({ ...previous, [field]: value }));
@@ -201,6 +206,7 @@ export default function BookingPage() {
           bookingId: bookingRef.id,
           vehicleId: selected.id,
           serviceType: formState.serviceType,
+          estimatedFare,
           customerName: formState.fullName,
           customerEmail: formState.email,
         }),
@@ -316,9 +322,9 @@ export default function BookingPage() {
           <p className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
             PREMIUM BOOKING FORM
           </p>
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Reserve Your Vehicle</h1>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{siteContent.booking.formTitle}</h1>
           <p className="mt-2 text-sm text-neutral-300 sm:text-base">
-            Complete your trip details and our dispatch team will confirm availability promptly.
+            {siteContent.booking.formSubtitle}
           </p>
 
           {checkoutStatus === "success" ? (
@@ -464,7 +470,7 @@ export default function BookingPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {vehicles.map((vehicle) => {
+                  {fleetOptions.map((vehicle) => {
                     const isActive = selectedVehicle === vehicle.id;
                     return (
                       <button

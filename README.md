@@ -35,6 +35,39 @@ Add these in local `.env.local` and in Vercel Project Settings > Environment Var
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
+## Admin login
+
+The `/admin` page now uses a local PIN gate.
+
+- Admin PIN: `1844`
+- The PIN is stored in browser session while the tab/session remains open.
+
+Note: this controls UI access only. Firestore security rules should still enforce backend permissions in production.
+
+## CMS versioning
+
+Each CMS save creates a snapshot in Firestore collection `siteContentVersions` with author and timestamp metadata.
+The live content remains in `siteContent/main`.
+
+## Firestore security rules (recommended)
+
+This repo includes strict rules in `firestore.rules`:
+
+- Public can create `bookings` (for website booking form)
+- Only Firebase Auth users with custom claim `admin: true` can read/update bookings
+- Only admin can write `siteContent/main` and `siteContentVersions`
+
+Deploy rules with Firebase CLI:
+
+```bash
+firebase login
+firebase use <your-project-id>
+firebase deploy --only firestore:rules
+```
+
+Important: PIN-only admin UI is client-side convenience and does not prove identity to Firestore.
+For real backend protection, keep Firebase Auth for admin accounts and set custom claim `admin: true`.
+
 ## Stripe env vars
 
 Add these in local `.env.local` and in Vercel Project Settings > Environment Variables:
