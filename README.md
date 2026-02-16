@@ -44,6 +44,17 @@ Add these in local `.env.local` and in Vercel Project Settings > Environment Var
 
 Stripe checkout session endpoint: `POST /api/stripe/checkout`
 
+## AI concierge env vars (optional)
+
+To enable dynamic virtual concierge responses:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (default: `gpt-4o-mini`)
+
+API endpoint: `POST /api/concierge/chat`
+
+If OpenAI env vars are missing, the concierge falls back to safe local guidance.
+
 The Firebase client is initialized in `src/lib/firebase.ts`.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

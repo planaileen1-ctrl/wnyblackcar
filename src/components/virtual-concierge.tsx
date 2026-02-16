@@ -23,64 +23,27 @@ type ChatMessage = {
 };
 
 const quickActions = [
-  "¿Qué vehículo me conviene?",
-  "¿Cómo funciona el pago?",
-  "Llévame al paso 2",
-  "Llévame al paso 3",
+  "Which vehicle fits my trip?",
+  "How does payment work?",
+  "Take me to step 2",
+  "Take me to step 3",
 ];
-
-function buildAssistantReply(input: string, context: ConciergeContext) {
-  const lowerInput = input.toLowerCase();
-
-  if (lowerInput.includes("veh") || lowerInput.includes("car") || lowerInput.includes("coche")) {
-    if (context.passengers <= 3) {
-      return "Para tu grupo, Luxury Sedan suele ser la opción más elegante y eficiente. Si llevas más equipaje, considera Premium SUV.";
-    }
-
-    if (context.passengers <= 6) {
-      return "Con ese número de pasajeros, Premium SUV es el balance ideal entre lujo, espacio y comodidad.";
-    }
-
-    return "Para grupos grandes, Executive Van es la mejor opción para viajar con amplitud y estilo.";
-  }
-
-  if (lowerInput.includes("pago") || lowerInput.includes("stripe") || lowerInput.includes("checkout")) {
-    return "Al confirmar tu reserva, te redirigimos a Stripe Checkout para pago seguro. Si cancelas, tu solicitud queda guardada como borrador para retomarla.";
-  }
-
-  if (lowerInput.includes("paso 2") || lowerInput.includes("step 2")) {
-    return "Perfecto. Te llevaré al paso de selección de vehículo para que elijas la clase ideal.";
-  }
-
-  if (lowerInput.includes("paso 3") || lowerInput.includes("step 3")) {
-    return "Perfecto. Te llevaré al paso final para completar datos y cerrar tu reserva.";
-  }
-
-  if (lowerInput.includes("precio") || lowerInput.includes("fare") || lowerInput.includes("costo")) {
-    return `Tu estimado actual es $${context.estimatedFare.toFixed(2)} USD para ${context.serviceTypeLabel}.`;
-  }
-
-  if (lowerInput.includes("hola") || lowerInput.includes("hello") || lowerInput.includes("hi")) {
-    return "Hola, soy tu concierge virtual. Te acompaño para elegir servicio, vehículo y finalizar tu reserva sin fricción.";
-  }
-
-  return "Puedo ayudarte con selección de vehículo, pasos de reserva, pago con Stripe o recomendaciones según pasajeros y equipaje.";
-}
 
 export default function VirtualConcierge({ context, onGoToStep }: VirtualConciergeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
-      text: "Soy tu concierge virtual. Te acompaño para reservar más rápido y con recomendaciones premium.",
+      text: "I’m your virtual concierge. I’ll help you book faster with premium recommendations.",
     },
   ]);
 
   const subtitle = useMemo(() => {
     const vehicle = context.selectedVehicleName ? ` · ${context.selectedVehicleName}` : "";
-    return `Paso ${context.bookingStep} · ${context.serviceTypeLabel}${vehicle}`;
+    return `Step ${context.bookingStep} · ${context.serviceTypeLabel}${vehicle}`;
   }, [context.bookingStep, context.selectedVehicleName, context.serviceTypeLabel]);
 
   function appendAssistantMessage(text: string) {
@@ -105,36 +68,71 @@ export default function VirtualConcierge({ context, onGoToStep }: VirtualConcier
     ]);
   }
 
-  function triggerAction(actionText: string) {
+  async function requestAssistantReply(input: string) {
+    const history = messages.map((message) => ({
+      role: message.role,
+      text: message.text,
+    }));
+
+    try {
+      setIsThinking(true);
+
+      const response = await fetch("/api/concierge/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: input,
+          history,
+          context,
+        }),
+      });
+
+      const data = (await response.json()) as { reply?: string };
+
+      appendAssistantMessage(
+        data.reply ??
+          "I can help with vehicle selection, booking steps, and a smooth checkout flow.",
+      );
+    } catch {
+      appendAssistantMessage(
+        "I can help with vehicle selection, booking steps, and a smooth checkout flow.",
+      );
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
+  async function triggerAction(actionText: string) {
     appendUserMessage(actionText);
 
-    const assistantReply = buildAssistantReply(actionText, context);
-    appendAssistantMessage(assistantReply);
+    await requestAssistantReply(actionText);
 
-    if (actionText.includes("paso 2")) {
+    if (actionText.toLowerCase().includes("step 2")) {
       onGoToStep(2);
       return;
     }
 
-    if (actionText.includes("paso 3")) {
+    if (actionText.toLowerCase().includes("step 3")) {
       onGoToStep(3);
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmed = inputValue.trim();
     if (!trimmed) return;
 
     appendUserMessage(trimmed);
-    appendAssistantMessage(buildAssistantReply(trimmed, context));
+    await requestAssistantReply(trimmed);
 
-    if (trimmed.toLowerCase().includes("paso 2") || trimmed.toLowerCase().includes("step 2")) {
+    if (trimmed.toLowerCase().includes("step 2")) {
       onGoToStep(2);
     }
 
-    if (trimmed.toLowerCase().includes("paso 3") || trimmed.toLowerCase().includes("step 3")) {
+    if (trimmed.toLowerCase().includes("step 3")) {
       onGoToStep(3);
     }
 
@@ -191,6 +189,17 @@ export default function VirtualConcierge({ context, onGoToStep }: VirtualConcier
                 ) : null}
               </div>
             ))}
+
+            {isThinking ? (
+              <div className="flex items-start gap-2">
+                <div className="mt-0.5 rounded-full bg-amber-500/20 p-1.5 text-amber-300">
+                  <Bot className="h-3.5 w-3.5" />
+                </div>
+                <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-neutral-300">
+                  Thinking...
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="border-t border-white/10 px-4 py-3">
@@ -211,7 +220,7 @@ export default function VirtualConcierge({ context, onGoToStep }: VirtualConcier
               <input
                 value={inputValue}
                 onChange={(event) => setInputValue(event.target.value)}
-                placeholder="Escribe tu duda..."
+                placeholder="Ask me anything..."
                 className="w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-2 text-xs text-white outline-none placeholder:text-neutral-500 focus:border-amber-400"
               />
               <button
