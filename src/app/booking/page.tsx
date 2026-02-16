@@ -293,7 +293,7 @@ export default function BookingPage() {
             <p className="text-sm font-semibold tracking-[0.22em] text-white">
               WNY <span className="text-amber-500">BLACK CAR</span>
             </p>
-            <p className="text-xs text-neutral-400">Private Reservation Desk</p>
+            <p className="text-xs text-neutral-400">Vehicle Rental Desk</p>
           </div>
 
           <div className="hidden items-center gap-8 md:flex">
@@ -316,20 +316,20 @@ export default function BookingPage() {
           <p className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-amber-400">
             PREMIUM BOOKING FORM
           </p>
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Reserve Your Chauffeur</h1>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Reserve Your Vehicle</h1>
           <p className="mt-2 text-sm text-neutral-300 sm:text-base">
             Complete your trip details and our dispatch team will confirm availability promptly.
           </p>
 
           {checkoutStatus === "success" ? (
             <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-              Payment received successfully. Your reservation is now in our dispatch queue.
+              Payment received successfully. Your vehicle booking is now in our queue.
             </p>
           ) : null}
 
           {checkoutStatus === "cancelled" ? (
             <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-              Stripe checkout was cancelled. Your reservation draft is saved and can be completed again.
+              Stripe checkout was cancelled. Your booking draft is saved and can be completed again.
             </p>
           ) : null}
 
@@ -529,7 +529,7 @@ export default function BookingPage() {
             {bookingStep === 3 ? (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h2 className="text-lg font-semibold">Complete Reservation</h2>
+                  <h2 className="text-lg font-semibold">Complete Vehicle Booking</h2>
                   <p className="text-sm text-neutral-400">Final contact details for dispatch confirmation.</p>
                 </div>
 
@@ -603,7 +603,7 @@ export default function BookingPage() {
                     disabled={isSubmitting}
                     className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-bold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isSubmitting ? "Saving booking..." : "Book My Black Car"}
+                    {isSubmitting ? "Saving booking..." : "Confirm Vehicle Booking"}
                   </button>
                 </div>
               </div>
@@ -645,7 +645,7 @@ export default function BookingPage() {
           <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
             <p className="text-xs uppercase tracking-wide text-neutral-400">Service standards</p>
             <ul className="mt-3 space-y-2 text-sm text-neutral-300">
-              <li>• Professionally vetted chauffeurs</li>
+              <li>• Well-maintained premium vehicles</li>
               <li>• 24/7 dispatch support</li>
               <li>• Discreet, private transportation</li>
             </ul>

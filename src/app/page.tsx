@@ -56,7 +56,7 @@ export default function Home() {
     {
       title: "Hourly Service",
       description:
-        "A dedicated chauffeur at your disposal for flexible multi-stop itineraries.",
+        "Flexible premium vehicle rental for multi-stop schedules and custom itineraries.",
     },
   ];
 
@@ -78,7 +78,7 @@ export default function Home() {
             <p className="text-sm font-semibold tracking-[0.22em] text-white">
               WNY <span className="text-amber-500">BLACK CAR</span>
             </p>
-            <p className="text-xs text-neutral-400">Executive Chauffeur Experience</p>
+            <p className="text-xs text-neutral-400">Executive Vehicle Rental Experience</p>
           </div>
 
           <nav className="hidden items-center gap-8 md:flex">
