@@ -520,7 +520,7 @@ export default function BookingPage() {
                     disabled={!canProceedStep2}
                     className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-bold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Confirm Booking Details
+                    Confirm Rental Details
                   </button>
                 </div>
               </div>
@@ -603,7 +603,7 @@ export default function BookingPage() {
                     disabled={isSubmitting}
                     className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-bold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isSubmitting ? "Saving booking..." : "Confirm Vehicle Booking"}
+                    {isSubmitting ? "Saving rental..." : "Confirm Vehicle Rental"}
                   </button>
                 </div>
               </div>
@@ -612,7 +612,7 @@ export default function BookingPage() {
         </section>
 
         <aside className="h-fit rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900 to-black p-6 lg:sticky lg:top-28">
-          <h2 className="text-xl font-semibold">Booking Summary</h2>
+          <h2 className="text-xl font-semibold">Rental Summary</h2>
           <p className="mt-2 text-sm text-neutral-300">Live preview as you complete each step.</p>
 
           <div className="mt-6 space-y-3 text-sm">

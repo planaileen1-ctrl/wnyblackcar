@@ -139,7 +139,7 @@ export default function Home() {
                 href="/booking"
                 className="rounded-full bg-white px-10 py-4 text-base font-bold text-black transition hover:bg-amber-500"
               >
-                Reserve Your Ride
+                Rent Your Vehicle
               </Link>
               <Link
                 href="#services"
@@ -191,7 +191,7 @@ export default function Home() {
                       href="/booking"
                       className="mt-7 rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-center text-sm font-semibold transition-all hover:bg-amber-500 hover:text-black"
                     >
-                      Reserve this vehicle
+                      Rent this vehicle
                     </Link>
                   </div>
                 </article>
