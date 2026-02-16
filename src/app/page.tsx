@@ -1,4 +1,25 @@
 export default function Home() {
+  const fleetPhotos = [
+    {
+      name: "Chevrolet Suburban",
+      seats: "Up to 6 passengers",
+      image:
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1600&q=80",
+    },
+    {
+      name: "Luxury Sedan",
+      seats: "Executive comfort for 3",
+      image:
+        "https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=1600&q=80",
+    },
+    {
+      name: "Sprinter Van",
+      seats: "Group rides up to 14",
+      image:
+        "https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=1600&q=80",
+    },
+  ];
+
   const todayUsa = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -57,6 +78,30 @@ export default function Home() {
               <p className="text-2xl font-bold">No Surge</p>
               <p className="text-sm text-slate-300">Flat-rate transparency</p>
             </article>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <p className="text-sm font-semibold tracking-wide text-slate-200">
+              Featured Fleet
+            </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {fleetPhotos.map((vehicle) => (
+                <article
+                  key={vehicle.name}
+                  className="group relative h-40 overflow-hidden rounded-xl border border-white/10"
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                    style={{ backgroundImage: `url(${vehicle.image})` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                  <div className="absolute bottom-0 w-full p-3">
+                    <p className="text-sm font-semibold text-white">{vehicle.name}</p>
+                    <p className="text-xs text-slate-200">{vehicle.seats}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
