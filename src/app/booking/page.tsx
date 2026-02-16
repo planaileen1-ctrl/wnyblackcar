@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { firebaseConfigError, firestoreDb } from "@/lib/firebase";
+import VirtualConcierge from "@/components/virtual-concierge";
 
 type ServiceType = "one-way" | "round-trip" | "hourly";
 
@@ -252,6 +253,28 @@ export default function BookingPage() {
   const canProceedStep2 = Boolean(selected);
 
   function goToStep(nextStep: 1 | 2 | 3) {
+    setSubmitError("");
+    setBookingStep(nextStep);
+  }
+
+  function goToStepFromConcierge(nextStep: 1 | 2 | 3) {
+    if (nextStep === 2 && !canProceedStep1) {
+      setSubmitError("Complete trip details first so I can open vehicle selection.");
+      return;
+    }
+
+    if (nextStep === 3) {
+      if (!canProceedStep1) {
+        setSubmitError("Complete trip details first before proceeding to confirmation.");
+        return;
+      }
+
+      if (!canProceedStep2) {
+        setSubmitError("Select a vehicle first before proceeding to confirmation.");
+        return;
+      }
+    }
+
     setSubmitError("");
     setBookingStep(nextStep);
   }
@@ -633,6 +656,17 @@ export default function BookingPage() {
           </p>
         </aside>
       </main>
+
+      <VirtualConcierge
+        context={{
+          bookingStep,
+          serviceTypeLabel: serviceTypeLabel(formState.serviceType),
+          passengers: formState.passengers,
+          selectedVehicleName: selected?.name,
+          estimatedFare,
+        }}
+        onGoToStep={goToStepFromConcierge}
+      />
     </div>
   );
 }
