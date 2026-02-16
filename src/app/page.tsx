@@ -1,64 +1,94 @@
-import Image from "next/image";
-
 export default function Home() {
+  const todayUsa = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  }).format(new Date());
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.18em] text-amber-300">
+              WNY BLACK CAR
+            </p>
+            <p className="text-xs text-slate-400">Premium Chauffeur Experience</p>
+          </div>
+          <p className="text-xs text-slate-300">{todayUsa} • EST</p>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-6xl gap-8 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:py-16">
+        <section className="space-y-6">
+          <p className="inline-flex rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 text-xs font-medium tracking-wide text-amber-200">
+            Airport • Corporate • Private Events
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
+            Executive black car booking for Western New York.
+          </h1>
+          <p className="max-w-xl text-base text-slate-300 sm:text-lg">
+            Book premium rides in minutes with transparent pricing, professional
+            chauffeurs, and 24/7 reliability across Buffalo, Niagara Falls, and
+            Rochester.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            <button className="rounded-lg bg-amber-300 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-200">
+              Book a Ride
+            </button>
+            <button className="rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+              View Fleet
+            </button>
+          </div>
+
+          <div className="grid gap-4 pt-2 sm:grid-cols-3">
+            <article className="rounded-xl border border-white/10 bg-slate-900 p-4">
+              <p className="text-2xl font-bold">200+</p>
+              <p className="text-sm text-slate-300">Five-star reviews</p>
+            </article>
+            <article className="rounded-xl border border-white/10 bg-slate-900 p-4">
+              <p className="text-2xl font-bold">24/7</p>
+              <p className="text-sm text-slate-300">Live booking support</p>
+            </article>
+            <article className="rounded-xl border border-white/10 bg-slate-900 p-4">
+              <p className="text-2xl font-bold">No Surge</p>
+              <p className="text-sm text-slate-300">Flat-rate transparency</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl shadow-black/30">
+          <h2 className="text-xl font-semibold">Quick Booking Snapshot</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            Professional ride request flow for U.S. customers.
+          </p>
+
+          <div className="mt-6 space-y-4 text-sm">
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-4">
+              <p className="text-slate-400">Pickup</p>
+              <p className="font-medium">Buffalo Niagara International Airport</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-4">
+              <p className="text-slate-400">Drop-off</p>
+              <p className="font-medium">Downtown Buffalo, NY</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-4">
+              <p className="text-slate-400">Vehicle</p>
+              <p className="font-medium">Chevrolet Suburban • 6 passengers</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-900/70 p-4">
+              <p className="text-slate-400">Estimated Fare</p>
+              <p className="text-lg font-semibold text-amber-300">$145.00 USD</p>
+            </div>
+          </div>
+
+          <button className="mt-6 w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
+            Continue to Secure Checkout
+          </button>
+        </section>
       </main>
     </div>
   );
