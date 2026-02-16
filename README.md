@@ -35,6 +35,15 @@ Add these in local `.env.local` and in Vercel Project Settings > Environment Var
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
+## Stripe env vars
+
+Add these in local `.env.local` and in Vercel Project Settings > Environment Variables:
+
+- `STRIPE_SECRET_KEY`
+- `NEXT_PUBLIC_APP_URL` (example: `http://localhost:3000` for local, your Vercel domain in production)
+
+Stripe checkout session endpoint: `POST /api/stripe/checkout`
+
 The Firebase client is initialized in `src/lib/firebase.ts`.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

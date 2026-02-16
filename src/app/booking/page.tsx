@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowRight,
@@ -92,6 +92,7 @@ export default function BookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string>("");
   const [submitError, setSubmitError] = useState<string>("");
+  const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null);
   const [formState, setFormState] = useState<BookingFormState>({
     serviceType: "one-way",
     serviceDate: "",
@@ -127,6 +128,11 @@ export default function BookingPage() {
     () => (selected ? selected.baseFare * serviceMultiplier : 0),
     [selected, serviceMultiplier],
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setCheckoutStatus(params.get("checkout"));
+  }, []);
 
   function updateField<K extends keyof BookingFormState>(field: K, value: BookingFormState[K]) {
     setFormState((previous) => ({ ...previous, [field]: value }));
@@ -165,7 +171,7 @@ export default function BookingPage() {
     try {
       setIsSubmitting(true);
 
-      await addDoc(collection(firestoreDb, "bookings"), {
+      const bookingRef = await addDoc(collection(firestoreDb, "bookings"), {
         tripType: formState.serviceType,
         serviceDate: formState.serviceDate,
         pickupTime: formState.pickupTime,
@@ -185,7 +191,33 @@ export default function BookingPage() {
         createdAt: serverTimestamp(),
       });
 
-      setSubmitMessage("Booking request saved successfully. Our team will contact you shortly.");
+      const checkoutResponse = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingId: bookingRef.id,
+          vehicleId: selected.id,
+          serviceType: formState.serviceType,
+          customerName: formState.fullName,
+          customerEmail: formState.email,
+        }),
+      });
+
+      const checkoutData = (await checkoutResponse.json()) as { url?: string; error?: string };
+
+      if (!checkoutResponse.ok || !checkoutData.url) {
+        setSubmitMessage("Booking saved. Stripe checkout could not start automatically.");
+        setSubmitError(
+          checkoutData.error ?? "Unable to create Stripe checkout session. Please contact dispatch.",
+        );
+        return;
+      }
+
+      window.location.assign(checkoutData.url);
+
+      setSubmitMessage("Redirecting to secure payment...");
       setFormState({
         serviceType: "one-way",
         serviceDate: "",
@@ -265,6 +297,18 @@ export default function BookingPage() {
           <p className="mt-2 text-sm text-neutral-300 sm:text-base">
             Complete your trip details and our dispatch team will confirm availability promptly.
           </p>
+
+          {checkoutStatus === "success" ? (
+            <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              Payment received successfully. Your reservation is now in our dispatch queue.
+            </p>
+          ) : null}
+
+          {checkoutStatus === "cancelled" ? (
+            <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+              Stripe checkout was cancelled. Your reservation draft is saved and can be completed again.
+            </p>
+          ) : null}
 
           <div className="mt-6 flex items-center justify-between gap-3">
             {[1, 2, 3].map((step) => (
