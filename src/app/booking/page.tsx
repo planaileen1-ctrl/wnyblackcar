@@ -345,7 +345,7 @@ export default function BookingPage() {
           </form>
         </section>
 
-        <aside className="h-fit rounded-3xl border border-white/10 bg-gradient-to-b from-neutral-900 to-black p-6 lg:sticky lg:top-28">
+        <aside className="h-fit rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900 to-black p-6 lg:sticky lg:top-28">
           <h2 className="text-xl font-semibold">Booking Summary</h2>
           <p className="mt-2 text-sm text-neutral-300">Review your trip details before submitting.</p>
 

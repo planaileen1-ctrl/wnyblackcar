@@ -113,7 +113,7 @@ export default function Home() {
                   "url(https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=2000)",
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-neutral-950 via-neutral-950/20 to-transparent" />
           </div>
 
           <div className="relative z-10 mx-auto max-w-5xl text-center">
@@ -124,7 +124,7 @@ export default function Home() {
             <h1 className="text-5xl font-bold leading-tight tracking-tight md:text-7xl">
               Travel with distinction.
               <br />
-              <span className="text-transparent bg-gradient-to-r from-white to-neutral-500 bg-clip-text">
+              <span className="text-transparent bg-linear-to-r from-white to-neutral-500 bg-clip-text">
                 Arrive with precision.
               </span>
             </h1>
@@ -237,7 +237,7 @@ export default function Home() {
         <section id="contact" className="relative overflow-hidden bg-neutral-950 px-6 py-24">
           <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-amber-500/10 blur-[120px]" />
 
-          <div className="relative z-10 mx-auto max-w-5xl rounded-[2.2rem] border border-white/10 bg-gradient-to-br from-neutral-900 to-black p-8 shadow-2xl md:p-14">
+          <div className="relative z-10 mx-auto max-w-5xl rounded-[2.2rem] border border-white/10 bg-linear-to-br from-neutral-900 to-black p-8 shadow-2xl md:p-14">
             <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
               <div>
                 <h2 className="text-4xl font-bold">Ready for your next destination?</h2>
