@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { firestoreDb } from "@/lib/firebase";
 
 type VehicleOption = {
   id: string;
@@ -37,9 +39,33 @@ const vehicles: VehicleOption[] = [
   },
 ];
 
+type BookingFormState = {
+  serviceDate: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  pickupTime: string;
+  passengers: number;
+  fullName: string;
+  email: string;
+  phone: string;
+};
+
 export default function BookingPage() {
   const [selectedVehicle, setSelectedVehicle] = useState<string>(vehicles[0].id);
   const [tripType, setTripType] = useState<"one-way" | "round-trip">("one-way");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string>("");
+  const [formState, setFormState] = useState<BookingFormState>({
+    serviceDate: "",
+    pickupAddress: "",
+    dropoffAddress: "",
+    pickupTime: "",
+    passengers: 2,
+    fullName: "",
+    email: "",
+    phone: "",
+  });
 
   const currentDateUs = useMemo(() => {
     return new Intl.DateTimeFormat("en-US", {
@@ -53,6 +79,76 @@ export default function BookingPage() {
 
   const selected = vehicles.find((vehicle) => vehicle.id === selectedVehicle) ?? vehicles[0];
   const estimatedFare = tripType === "round-trip" ? selected.baseFare * 2 : selected.baseFare;
+
+  function updateField<K extends keyof BookingFormState>(field: K, value: BookingFormState[K]) {
+    setFormState((previous) => ({ ...previous, [field]: value }));
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitError("");
+    setSubmitMessage("");
+
+    if (!formState.serviceDate || !formState.pickupTime) {
+      setSubmitError("Please select service date and pickup time.");
+      return;
+    }
+
+    if (!formState.pickupAddress || !formState.dropoffAddress) {
+      setSubmitError("Please enter pickup and drop-off addresses.");
+      return;
+    }
+
+    if (!formState.fullName || !formState.email || !formState.phone) {
+      setSubmitError("Please complete your contact information.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await addDoc(collection(firestoreDb, "bookings"), {
+        tripType,
+        serviceDate: formState.serviceDate,
+        pickupTime: formState.pickupTime,
+        pickupAddress: formState.pickupAddress,
+        dropoffAddress: formState.dropoffAddress,
+        passengers: formState.passengers,
+        vehicleId: selected.id,
+        vehicleName: selected.name,
+        estimatedFare,
+        customerName: formState.fullName,
+        customerEmail: formState.email,
+        customerPhone: formState.phone,
+        status: "pending",
+        paymentStatus: "unpaid",
+        source: "web-booking",
+        createdAt: serverTimestamp(),
+      });
+
+      setSubmitMessage("Booking request saved successfully. Our team will contact you shortly.");
+      setFormState({
+        serviceDate: "",
+        pickupAddress: "",
+        dropoffAddress: "",
+        pickupTime: "",
+        passengers: 2,
+        fullName: "",
+        email: "",
+        phone: "",
+      });
+      setTripType("one-way");
+      setSelectedVehicle(vehicles[0].id);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? `Unable to save booking: ${error.message}`
+          : "Unable to save booking right now.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -73,7 +169,8 @@ export default function BookingPage() {
             Secure your premium black car service in minutes.
           </p>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <form className="mt-6" onSubmit={handleSubmit}>
+            <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-2">
               <span className="text-xs font-medium tracking-wide text-slate-300">Trip Type</span>
               <select
@@ -90,6 +187,8 @@ export default function BookingPage() {
               <span className="text-xs font-medium tracking-wide text-slate-300">Service Date</span>
               <input
                 type="date"
+                value={formState.serviceDate}
+                onChange={(event) => updateField("serviceDate", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
               />
             </label>
@@ -99,6 +198,8 @@ export default function BookingPage() {
               <input
                 type="text"
                 placeholder="Buffalo Niagara International Airport"
+                value={formState.pickupAddress}
+                onChange={(event) => updateField("pickupAddress", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
               />
             </label>
@@ -108,6 +209,8 @@ export default function BookingPage() {
               <input
                 type="text"
                 placeholder="Downtown Buffalo, NY"
+                value={formState.dropoffAddress}
+                onChange={(event) => updateField("dropoffAddress", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
               />
             </label>
@@ -116,6 +219,8 @@ export default function BookingPage() {
               <span className="text-xs font-medium tracking-wide text-slate-300">Pickup Time</span>
               <input
                 type="time"
+                value={formState.pickupTime}
+                onChange={(event) => updateField("pickupTime", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
               />
             </label>
@@ -126,13 +231,16 @@ export default function BookingPage() {
                 type="number"
                 min={1}
                 max={14}
-                defaultValue={2}
+                value={formState.passengers}
+                onChange={(event) =>
+                  updateField("passengers", Number.parseInt(event.target.value || "1", 10))
+                }
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-300"
               />
             </label>
-          </div>
+            </div>
 
-          <div className="mt-8 space-y-3">
+            <div className="mt-8 space-y-3">
             <p className="text-sm font-semibold text-slate-100">Select Vehicle</p>
             <div className="grid gap-4 sm:grid-cols-3">
               {vehicles.map((vehicle) => (
@@ -157,14 +265,16 @@ export default function BookingPage() {
                 </button>
               ))}
             </div>
-          </div>
+            </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <label className="space-y-2">
               <span className="text-xs font-medium tracking-wide text-slate-300">Full Name</span>
               <input
                 type="text"
                 placeholder="John Carter"
+                value={formState.fullName}
+                onChange={(event) => updateField("fullName", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
               />
             </label>
@@ -173,6 +283,8 @@ export default function BookingPage() {
               <input
                 type="email"
                 placeholder="john@email.com"
+                value={formState.email}
+                onChange={(event) => updateField("email", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
               />
             </label>
@@ -181,10 +293,33 @@ export default function BookingPage() {
               <input
                 type="tel"
                 placeholder="(716) 000-0000"
+                value={formState.phone}
+                onChange={(event) => updateField("phone", event.target.value)}
                 className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-300"
               />
             </label>
-          </div>
+
+              {submitError ? (
+                <p className="sm:col-span-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {submitError}
+                </p>
+              ) : null}
+
+              {submitMessage ? (
+                <p className="sm:col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                  {submitMessage}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="sm:col-span-2 rounded-lg bg-amber-300 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Saving booking..." : "Submit Booking Request"}
+              </button>
+            </div>
+          </form>
         </section>
 
         <aside className="h-fit rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-6 lg:sticky lg:top-6">
