@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import FirebaseConfigBanner from "@/components/firebase-config-banner";
+import { firebaseConfigError } from "@/lib/firebase-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,11 +24,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const showFirebaseBanner = Boolean(firebaseConfigError);
+
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${showFirebaseBanner ? "pt-10" : ""} antialiased`}
       >
+        <FirebaseConfigBanner />
         {children}
       </body>
     </html>

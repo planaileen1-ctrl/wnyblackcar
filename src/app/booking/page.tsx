@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { firestoreDb } from "@/lib/firebase";
+import { firebaseConfigError, firestoreDb } from "@/lib/firebase";
 
 type VehicleOption = {
   id: string;
@@ -88,6 +88,11 @@ export default function BookingPage() {
     event.preventDefault();
     setSubmitError("");
     setSubmitMessage("");
+
+    if (!firestoreDb) {
+      setSubmitError(firebaseConfigError ?? "Firebase is not configured.");
+      return;
+    }
 
     if (!formState.serviceDate || !formState.pickupTime) {
       setSubmitError("Please select service date and pickup time.");
